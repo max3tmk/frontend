@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchAllImages } from "../features/imageSlice";
+import { fetchUserImages } from "../features/imageSlice";
 import { getUserIdFromToken, getUsernameFromToken } from "../utils/jwtUtils";
 import api from "../api/axios.js";
 import likeIcon from "../assets/icons/like.svg";
@@ -8,9 +8,9 @@ import commentIcon from "../assets/icons/comment.svg";
 import editIcon from "../assets/icons/edit.svg";
 import deleteIcon from "../assets/icons/delete.svg";
 
-export default function ImageGallery() {
+export default function MyImages() {
     const dispatch = useDispatch();
-    const { all, status, error } = useSelector((state) => state.images);
+    const { user, status, error } = useSelector((state) => state.images);
     const accessToken = useSelector((state) => state.auth.token);
     const userId = accessToken ? getUserIdFromToken(accessToken) : null;
     const username = accessToken ? getUsernameFromToken(accessToken) : "User";
@@ -23,26 +23,20 @@ export default function ImageGallery() {
     const [editingComment, setEditingComment] = useState({});
     const [editContent, setEditContent] = useState({});
 
-    /**
-     * @typedef {Object} Comment
-     * @property {string} id
-     * @property {string} userId
-     * @property {string} authorName
-     * @property {string} content
-     */
+    useEffect(() => {
+        if (userId) {
+            dispatch(fetchUserImages({ userId, page, size: 10 }));
+        }
+    }, [dispatch, userId, page]);
 
     useEffect(() => {
-        dispatch(fetchAllImages({ page, size: 10 }));
-    }, [dispatch, page]);
-
-    useEffect(() => {
-        if (!all?.content) return;
+        if (!user?.content) return;
 
         const loadInteractions = async () => {
             const likesUpdates = {};
             const commentsUpdates = {};
 
-            for (const img of all.content) {
+            for (const img of user.content) {
                 try {
                     const res = await api.get(`/images/${img.id}/likes/count`, {
                         headers: { Authorization: `Bearer ${accessToken}` },
@@ -67,7 +61,7 @@ export default function ImageGallery() {
         };
 
         loadInteractions();
-    }, [all, accessToken]);
+    }, [user, accessToken]);
 
     const handleLikeClick = async (imageId) => {
         try {
@@ -167,7 +161,8 @@ export default function ImageGallery() {
         }
     };
 
-    if (status === "loading") return <p>Loading...</p>;
+    if (!userId) return <p>Please log in to view your images.</p>;
+    if (status === "loading") return <p>Loading your images...</p>;
     if (status === "failed") {
         const errText = typeof error === "string" ? error : JSON.stringify(error, null, 2);
         return <pre style={{ color: "red" }}>Error: {errText}</pre>;
@@ -175,9 +170,9 @@ export default function ImageGallery() {
 
     return (
         <div>
-            <h2>All Images</h2>
+            <h2>My Images</h2>
             <div style={{ display: "flex", flexWrap: "wrap" }}>
-                {all?.content?.map((image) => (
+                {user?.content?.map((image) => (
                     <div key={image.id} style={{ margin: "10px", width: "200px" }}>
                         <p style={{ fontWeight: "bold", marginBottom: "4px" }}>
                             {image.description || "No description"}
@@ -307,16 +302,16 @@ export default function ImageGallery() {
                 ))}
             </div>
 
-            {all?.totalElements > 0 ? (
+            {user?.totalElements > 0 ? (
                 <div style={{ marginTop: "20px", textAlign: "center" }}>
                     <button disabled={page === 0} onClick={() => setPage(page - 1)}>
                         Prev
                     </button>
                     <span style={{ margin: "0 10px" }}>
-                        Page {page + 1} of {all.totalPages}
+                        Page {page + 1} of {user.totalPages}
                     </span>
                     <button
-                        disabled={page >= all.totalPages - 1}
+                        disabled={page >= user.totalPages - 1}
                         onClick={() => setPage(page + 1)}
                     >
                         Next
@@ -324,9 +319,9 @@ export default function ImageGallery() {
                 </div>
             ) : (
                 <div style={{ marginTop: "20px", textAlign: "center", fontSize: "18px", color: "#666" }}>
-                    No images found.
+                    You haven't uploaded any images yet.
                     <br />
-                    Try uploading one!
+                    Click "Upload Image" to get started!
                 </div>
             )}
         </div>
